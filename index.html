@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Punch List</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Punch List">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#eceeea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#151a19" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: phone-first walkthrough. Sticky header with open count + filters, then one card per room that expands into big tap-target items. */
+:root {
+  --bg: #eceeea;
+  --sheet: #f8f9f6;
+  --ink: #1d2422;
+  --muted: #5d6763;
+  --rule: #cfd4cf;
+  --accent: #e8a317;
+  --accent-ink: #2a1e00;
+  --done: #2f7d4f;
+  --chip: #dde8f2;
+  --chip-ink: #2d5f8a;
+  --danger: #b23b2e;
+  --focus: #2d5f8a;
+  --f-display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151a19; --sheet: #1d2422; --ink: #e6ebe7; --muted: #9aa49f; --rule: #333d3a;
+    --accent: #f0b232; --accent-ink: #231800; --done: #58b07c; --chip: #1f3245; --chip-ink: #8db8de; --danger: #e07a6c; --focus: #8db8de;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151a19; --sheet: #1d2422; --ink: #e6ebe7; --muted: #9aa49f; --rule: #333d3a;
+  --accent: #f0b232; --accent-ink: #231800; --done: #58b07c; --chip: #1f3245; --chip-ink: #8db8de; --danger: #e07a6c; --focus: #8db8de;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.45; }
+.wrap { max-width: 720px; margin: 0 auto; padding-inline: 16px; padding-block: 0 56px; }
+button, select, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.titlebar { padding-block: 16px 0; }
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 4px 10px; border-bottom: 1px solid var(--rule); }
+.row1 { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.eyebrow { font-family: var(--f-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: 34px; line-height: 1; margin: 2px 0 0; text-transform: uppercase; letter-spacing: .01em; }
+.count { text-align: right; font-variant-numeric: tabular-nums; flex: none; }
+.count .big { font-family: var(--f-display); font-weight: 700; font-size: 34px; line-height: 1; }
+.count .lbl { font-size: 12px; color: var(--muted); }
+.jobinfo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; padding-block: 14px 4px; }
+.jobinfo .f { display: grid; gap: 3px; min-width: 0; }
+.jobinfo .w2 { grid-column: span 2; }
+.jobinfo label { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.jobinfo input { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); font-size: 16px; }
+.jobinfo input::placeholder { color: var(--muted); }
+.gauge { height: 8px; background: var(--rule); border-radius: 2px; overflow: hidden; margin-top: 10px; }
+.gauge i { display: block; height: 100%; width: 0; background: var(--done); transition: width .3s; }
+.filters { display: flex; gap: 8px; margin-top: 10px; }
+.filters select { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); font-size: 15px; }
+.tools { display: flex; gap: 8px; margin-top: 8px; align-items: center; flex-wrap: wrap; }
+.btn { border: 1px solid var(--rule); background: var(--sheet); border-radius: 6px; padding: 8px 12px; font-size: 14px; cursor: pointer; min-height: 40px; }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.danger { color: var(--danger); border-color: var(--danger); }
+.saved { margin-left: auto; font-size: 12px; color: var(--muted); font-family: var(--f-mono); }
+
+.tip { margin-top: 14px; background: var(--sheet); border: 1px dashed var(--rule); border-radius: 6px; padding: 10px 12px; font-size: 14px; display: flex; gap: 10px; align-items: flex-start; }
+.tip p { margin: 0; flex: 1; min-width: 0; }
+.tip b { font-weight: 600; }
+.x { background: none; border: 0; color: var(--muted); font-size: 20px; line-height: 1; padding: 0 4px; cursor: pointer; }
+
+main { display: grid; gap: 10px; margin-top: 14px; }
+h2.floor { font-family: var(--f-mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 500; margin: 12px 0 0; padding-bottom: 6px; border-bottom: 2px solid var(--accent); }
+h2.floor:first-child { margin-top: 0; }
+.room { background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.room-head { display: flex; align-items: center; gap: 12px; width: 100%; background: none; border: 0; padding: 14px; cursor: pointer; text-align: left; min-height: 56px; }
+.room-name { font-family: var(--f-display); font-weight: 600; font-size: 22px; text-transform: uppercase; letter-spacing: .02em; flex: 1; min-width: 0; line-height: 1.1; }
+.pill { font-family: var(--f-mono); font-size: 12px; padding: 3px 8px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); flex: none; font-variant-numeric: tabular-nums; }
+.pill.clear { background: var(--done); color: var(--sheet); }
+.pill.none { background: transparent; color: var(--muted); border: 1px solid var(--rule); }
+.chev { flex: none; color: var(--muted); transition: transform .2s; }
+.room.open .chev { transform: rotate(180deg); }
+.room-body { border-top: 1px solid var(--rule); }
+ul { list-style: none; margin: 0; padding: 0; }
+li.item { display: grid; grid-template-columns: 32px 1fr; gap: 6px 12px; padding: 12px 14px; border-bottom: 1px dashed var(--rule); }
+.item input[type=checkbox] { appearance: none; width: 28px; height: 28px; margin: 0; border: 2px solid var(--muted); border-radius: 6px; display: grid; place-content: center; cursor: pointer; background: var(--sheet); }
+.item input[type=checkbox]:checked { background: var(--done); border-color: var(--done); }
+.item input[type=checkbox]:checked::after { content: ""; width: 7px; height: 13px; border: solid var(--sheet); border-width: 0 3px 3px 0; transform: rotate(45deg) translate(-1px, -1px); }
+.it-main { min-width: 0; }
+.it-main label { cursor: pointer; display: block; }
+.item.done .txt { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--rule); }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.trade { font-family: var(--f-mono); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--chip-ink); background: var(--chip); padding: 2px 7px; border-radius: 3px; }
+.when { font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+.link { background: none; border: 0; padding: 4px 2px; color: var(--chip-ink); font-size: 13px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.link.muted { color: var(--muted); }
+.note { font-size: 14px; color: var(--muted); margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.edit { grid-column: 1 / 3; display: grid; gap: 8px; }
+.edit textarea, .add input, .add select, .addroom input { width: 100%; padding: 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--bg); font-size: 16px; }
+.edit textarea { min-height: 72px; resize: vertical; }
+.edit .acts, .confirm .acts { display: flex; gap: 8px; justify-content: flex-end; }
+.add { display: grid; grid-template-columns: 1fr 130px auto; gap: 8px; padding: 12px 14px; }
+.room-foot { display: flex; justify-content: flex-end; padding: 0 14px 12px; }
+.confirm { padding: 12px 14px; border-top: 1px solid var(--rule); display: grid; gap: 8px; font-size: 14px; }
+.empty { padding: 12px 14px; font-size: 14px; color: var(--muted); }
+.addroom { display: grid; grid-template-columns: 1fr 140px auto; gap: 8px; margin-top: 18px; }
+.addroom select { padding: 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); font-size: 16px; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 14px; z-index: 10; max-width: calc(100% - 32px); }
+.copybox { margin-top: 10px; }
+.copybox textarea { width: 100%; min-height: 140px; font-family: var(--f-mono); font-size: 12px; padding: 8px; border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); }
+@media (max-width: 480px) {
+  .jobinfo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .jobinfo .w2 { grid-column: 1 / -1; }
+  .jobinfo .w2 { order: 2; }
+  .add { grid-template-columns: 1fr 1fr; }
+  .add input { grid-column: 1 / 3; }
+  .addroom { grid-template-columns: 1fr auto; }
+  .addroom input { grid-column: 1 / 3; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+html { -webkit-text-size-adjust: 100%; }
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+[hidden] { display: none !important; }
+.back { background: none; border: 0; padding: 4px 0; margin-bottom: 6px; color: var(--chip-ink); font-size: 15px; cursor: pointer; }
+.banner { margin-top: 14px; background: var(--chip); color: var(--ink); border-radius: 6px; padding: 10px 12px; font-size: 14px; }
+ul.jobs { margin-top: 14px; display: grid; gap: 10px; }
+ul.jobs a { display: flex; align-items: center; gap: 12px; padding: 14px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; color: inherit; text-decoration: none; min-height: 64px; }
+ul.jobs a:hover { border-color: var(--muted); }
+.j-main { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.j-title { font-family: var(--f-display); font-weight: 600; font-size: 22px; text-transform: uppercase; letter-spacing: .02em; line-height: 1.1; overflow-wrap: anywhere; }
+.j-sub { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.danger-zone { margin-top: 28px; text-align: center; }
+.confirm.boxed { margin-top: 12px; border: 1px solid var(--danger); border-radius: 8px; background: var(--sheet); }
+.edit input, .edit select, #addTrade input, #addFloor input { width: 100%; padding: 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--bg); font-size: 16px; }
+#tradeList .trade, #floorList .trade { display: inline-flex; align-items: center; gap: 4px; }
+#tradeList .x, #floorList .x { font-size: 18px; padding: 0 2px; color: var(--chip-ink); }
+.item.done { box-shadow: inset 4px 0 0 var(--done); }
+.item.done .txt { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--muted); }
+.badge-done { font-family: var(--f-mono); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--sheet); background: var(--done); padding: 2px 7px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- Jobs list -->
+  <div id="jobsView" hidden>
+    <div class="titlebar">
+      <div class="eyebrow">Final walkthrough</div>
+      <h1>Punch Lists</h1>
+    </div>
+    <div class="banner" id="offlineBanner" hidden>Shared saving isn't set up yet, so lists are saved on this phone only. Add your Firebase settings to <b>firebase-config.js</b> to share them.</div>
+    <div class="tools" style="margin-top:16px">
+      <button type="button" class="btn primary" id="newJob">New punch list</button>
+      <span class="saved" id="jobsSaved"></span>
+    </div>
+    <ul class="jobs" id="jobs"></ul>
+    <div class="tip" id="tip">
+      <p><b>Put it on your iPhone:</b> in Safari, tap the Share button, then <b>Add to Home Screen</b>. It opens like an app from then on.</p>
+      <button type="button" class="x" id="tipX" aria-label="Hide tip">×</button>
+    </div>
+  </div>
+
+  <!-- One job -->
+  <div id="jobView" hidden>
+    <div class="titlebar">
+      <button type="button" class="back" id="backBtn">‹ All punch lists</button>
+      <div class="row1">
+        <div>
+          <div class="eyebrow">Final walkthrough</div>
+          <h1>Punch List</h1>
+        </div>
+        <div class="count"><div class="big" id="openN">0</div><div class="lbl" id="openL">open items</div></div>
+      </div>
+    </div>
+    <div class="jobinfo" id="jobinfo">
+      <div class="f"><label for="jDate">Date</label><input id="jDate" type="date" data-meta="date"></div>
+      <div class="f w2"><label for="jCommunity">Community</label><input id="jCommunity" type="text" maxlength="60" data-meta="community" placeholder="Community name"></div>
+      <div class="f w2"><label for="jAddress">Address</label><input id="jAddress" type="text" maxlength="100" data-meta="address" placeholder="Street address"></div>
+      <div class="f"><label for="jLot">Lot #</label><input id="jLot" type="text" maxlength="20" data-meta="lot" placeholder="Lot"></div>
+    </div>
+    <header class="top">
+      <div class="gauge" role="progressbar" aria-label="Punch list completion" aria-valuemin="0" aria-valuemax="100" id="gauge"><i id="gaugeFill"></i></div>
+      <div class="filters">
+        <select id="showF" aria-label="Show"><option value="all">All items</option><option value="open">Open items</option><option value="done">Completed</option></select>
+        <select id="tradeF" aria-label="Trade"></select>
+      </div>
+      <div class="tools">
+        <button type="button" class="btn" id="linkBtn">Send link</button>
+        <button type="button" class="btn" id="copyBtn">Copy list for subs</button>
+        <button type="button" class="btn" id="tradesBtn">Edit lists &amp; trades</button>
+        <span class="saved" id="saved">Loading…</span>
+      </div>
+      <div class="copybox" id="copyBox" hidden><textarea id="copyText" readonly aria-label="Text to copy"></textarea></div>
+      <div class="copybox" id="tradesBox" hidden><div class="eyebrow">Lists</div><div class="when" style="margin-top:4px">Removing a list moves its rooms to the first list.</div><div class="meta" id="floorList"></div><form id="addFloor" style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:10px 0 14px"><input id="newFloor" type="text" maxlength="30" placeholder="Add a list (e.g. Basement)" aria-label="New list"><button class="btn primary" type="submit">Add</button></form><div class="eyebrow">Trades</div><div class="meta" id="tradeList"></div><form id="addTrade" style="display:grid;grid-template-columns:1fr auto;gap:8px;padding-top:10px"><input id="newTrade" type="text" maxlength="30" placeholder="Add a trade (e.g. Insulation)" aria-label="New trade"><button class="btn primary" type="submit">Add</button></form></div>
+    </header>
+
+    <form class="addroom" id="addRoom">
+      <input id="newRoom" type="text" maxlength="40" placeholder="Add New Room" aria-label="New room name">
+      <select id="newRoomFloor" aria-label="List"></select>
+      <button class="btn primary" type="submit">Add</button>
+    </form>
+
+    <main id="rooms"></main>
+
+    <div class="danger-zone" id="dangerZone">
+      <button type="button" class="link muted" id="askDelJob">Delete this punch list</button>
+    </div>
+    <div class="confirm boxed" id="confirmDelJob" hidden>
+      Delete this whole punch list for everyone? This can't be undone.
+      <div class="acts"><button type="button" class="btn" id="keepJob">Keep it</button><button type="button" class="btn danger" id="delJob">Delete</button></div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+const DEFAULT_TRADES = ["Paint", "Drywall", "Carpentry", "Electrical", "Plumbing", "HVAC", "Flooring", "Tile", "Cabinets", "Windows/Doors", "Cleaning", "Exterior", "General"];
+let TRADES = DEFAULT_TRADES.slice();
+// Default rooms for every new punch list; items are entered on site.
+const ROOMS = [
+  { id: "hall2", floor: "Second Floor", name: "Hallway" },
+  { id: "master", floor: "Second Floor", name: "Master Bedroom" },
+  { id: "masterbath", floor: "Second Floor", name: "Master Bathroom" },
+  { id: "bed2", floor: "Second Floor", name: "Bed 2" },
+  { id: "bed2bath", floor: "Second Floor", name: "Bed 2 Private Bath" },
+  { id: "bed3", floor: "Second Floor", name: "Bed 3" },
+  { id: "bed4", floor: "Second Floor", name: "Bed 4" },
+  { id: "jackjill", floor: "Second Floor", name: "Jack and Jill" },
+  { id: "hallbath", floor: "Second Floor", name: "Hall Bath" },
+  { id: "foyer", floor: "First Floor", name: "Foyer" },
+  { id: "office", floor: "First Floor", name: "Office" },
+  { id: "dining", floor: "First Floor", name: "Dining Room" },
+  { id: "family", floor: "First Floor", name: "Family Room" },
+  { id: "kitchen", floor: "First Floor", name: "Kitchen" },
+  { id: "powder", floor: "First Floor", name: "Powder Room" },
+  { id: "hallLaundry", floor: "First Floor", name: "Hall to Laundry" },
+  { id: "laundry", floor: "First Floor", name: "Laundry" },
+  { id: "exterior", floor: "Exterior", name: "Exterior" }
+];
+const DEFAULT_FLOORS = ["Second Floor", "First Floor", "Exterior"];
+let FLOORS = DEFAULT_FLOORS.slice();
+const floorOf = f => FLOORS.includes(f) ? f : FLOORS[0];
+const COLLS = ["items", "custom", "rooms", "hidden"];
+
+// ---- storage: Firestore when configured, otherwise this phone only ----
+const cfg = window.FIREBASE_CONFIG || {};
+let fs = null;
+if (window.firebase && cfg.apiKey && !/PASTE/.test(cfg.apiKey)) {
+  try {
+    firebase.initializeApp(cfg);
+    fs = firebase.firestore();
+    fs.enablePersistence({ synchronizeTabs: true }).catch(() => {});  // keeps working with weak jobsite signal
+  } catch (e) { fs = null; }
+}
+const LS = "punch-app-v1";
+const local = (() => { try { return JSON.parse(localStorage.getItem(LS) || "{}"); } catch (e) { return {}; } })();
+local.jobs = local.jobs || {};
+function lsSave() { try { localStorage.setItem(LS, JSON.stringify(local)); } catch (e) {} }
+
+// ---- state ----
+let jobId = null;
+let state = blank();
+function blank() { return { items: {}, custom: {}, rooms: {}, hidden: {}, meta: {} }; }
+const ui = { show: "all", trade: "", open: {}, edit: null, confirm: null, editRoom: null };
+let jobsList = {};
+let unsubs = [];
+
+function uiPrefs() { try { return JSON.parse(localStorage.getItem(LS + "-ui") || "{}"); } catch (e) { return {}; } }
+function uiSave() { try { const p = uiPrefs(); p.open = p.open || {}; if (jobId) p.open[jobId] = ui.open; p.tipHidden = document.getElementById("tip").hidden; localStorage.setItem(LS + "-ui", JSON.stringify(p)); } catch (e) {} }
+
+function allRooms() {
+  const base = ROOMS.filter(r => !(state.hidden[r.id] && state.hidden[r.id].hidden)).map(r => { const o = state.rooms[r.id] || {}; return { id: r.id, name: o.name || r.name, floor: floorOf(o.floor || r.floor) }; });
+  const extra = Object.entries(state.rooms).filter(([id, r]) => r && r.name && !ROOMS.some(b => b.id === id))
+    .sort((a, b) => (a[1].createdAt || "").localeCompare(b[1].createdAt || ""))
+    .map(([id, r]) => ({ id, name: r.name, floor: floorOf(r.floor), custom: true }));
+  return base.concat(extra);
+}
+const rec = id => state.items[id] || {};
+function itemsOf(room) {
+  return Object.entries(state.custom).filter(([, c]) => c && c.room === room.id)
+    .sort((a, b) => (a[1].createdAt || "").localeCompare(b[1].createdAt || ""))
+    .map(([id, c]) => ({ id, text: c.text, trade: rec(id).trade || c.trade || "General" }));
+}
+function counts() {
+  let total = 0, open = 0;
+  allRooms().forEach(r => itemsOf(r).forEach(i => { total++; if (!rec(i.id).done) open++; }));
+  return { total, open };
+}
+
+// ---- writes ----
+function flag(msg) { document.getElementById("saved").textContent = msg; }
+let toastT;
+function toast(msg) { const t = document.getElementById("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2400); }
+function saveLocalJob() { local.jobs[jobId] = JSON.parse(JSON.stringify(state)); lsSave(); }
+async function put(coll, id, data) {
+  if (!fs) { saveLocalJob(); flag("Saved on this phone"); return; }
+  flag(navigator.onLine === false ? "Offline. Will sync when back online." : "Saving…");
+  try {
+    const ref = fs.doc("jobs/" + jobId + "/" + coll + "/" + id);
+    if (data) await ref.set(data); else await ref.delete();
+    flag("Saved");
+  } catch (e) { flag("Couldn't save. Check your connection."); }
+  saveSummary();
+}
+function saveItem(id) { const r = rec(id); put("items", id, { done: !!r.done, doneAt: r.doneAt || null, note: r.note || "", trade: r.trade || "", updatedAt: new Date().toISOString() }); }
+let metaQ, sumQ;
+function saveMeta() {
+  clearTimeout(metaQ);
+  metaQ = setTimeout(() => {
+    const m = state.meta, data = { date: m.date || "", community: m.community || "", address: m.address || "", lot: m.lot || "" };
+    if (!fs) { saveLocalJob(); flag("Saved on this phone"); return; }
+    fs.doc("jobs/" + jobId).set(data, { merge: true }).then(() => flag("Saved"), () => flag("Couldn't save. Check your connection."));
+  }, 600);
+}
+// Open/total counts on the job record so the jobs list can show them.
+function saveSummary() {
+  clearTimeout(sumQ);
+  sumQ = setTimeout(() => { if (fs && jobId) { const c = counts(); fs.doc("jobs/" + jobId).set({ openCount: c.open, totalCount: c.total, updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {}); } }, 1200);
+}
+
+// ---- render: one job ----
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmt = iso => { try { return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" }); } catch (e) { return ""; } };
+const fmtDay = d => { if (!d) return ""; const [y, m, dd] = d.split("-").map(Number); try { return new Date(y, m - 1, dd).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }); } catch (e) { return d; } };
+const tradeOpts = sel => (sel && !TRADES.includes(sel) ? TRADES.concat(sel) : TRADES).map(t => `<option${t === sel ? " selected" : ""}>${esc(t)}</option>`).join("");
+
+function render() {
+  if (!jobId) return;
+  const rooms = allRooms();
+  let total = 0, done = 0;
+  const parts = rooms.map(room => {
+    const all = itemsOf(room);
+    const tradeAll = ui.trade ? all.filter(i => i.trade === ui.trade) : all;
+    const openN = tradeAll.filter(i => !rec(i.id).done).length;
+    total += tradeAll.length; done += tradeAll.length - openN;
+    if (ui.trade && !tradeAll.length) return "";
+    const vis = tradeAll.filter(i => ui.show === "all" || (ui.show === "done") === !!rec(i.id).done);
+    const isOpen = !!ui.open[room.id];
+    const lis = vis.map(it => {
+      const r = rec(it.id), ed = ui.edit === it.id;
+      return `<li class="item ${r.done ? "done" : ""}" data-id="${it.id}">
+        <input type="checkbox" id="cb-${it.id}" ${r.done ? "checked" : ""} aria-label="${esc(it.text)}">
+        <div class="it-main"><label for="cb-${it.id}"><span class="txt">${esc(it.text)}</span></label>
+          ${r.note && !ed ? `<div class="note">${esc(r.note)}</div>` : ""}
+          <div class="meta"><span class="trade">${esc(it.trade)}</span>${r.done ? `<span class="badge-done">✓ Done${r.doneAt ? " " + fmt(r.doneAt) : ""}</span>` : ""}
+            ${ed ? "" : `<button type="button" class="link" data-edit="${it.id}">Edit</button>`}
+            ${ed ? "" : `<button type="button" class="link muted" data-delitem="${it.id}">Remove</button>`}</div></div>
+        ${ed ? `<div class="edit"><input type="text" id="text-${it.id}" maxlength="160" value="${esc(it.text)}" aria-label="Item text"><textarea id="note-${it.id}" placeholder="What's wrong, where exactly, who's fixing it…" aria-label="Note">${esc(r.note || "")}</textarea>
+          <select id="trade-${it.id}" aria-label="Trade">${tradeOpts(it.trade)}</select>
+          <div class="acts"><button type="button" class="btn" data-cancel>Cancel</button><button type="button" class="btn primary" data-saveedit="${it.id}">Save</button></div></div>` : ""}
+      </li>`;
+    }).join("");
+    const conf = ui.confirm === room.id;
+    return `<section class="room ${isOpen ? "open" : ""}" id="room-${room.id}">
+      <button type="button" class="room-head" data-toggle="${room.id}" aria-expanded="${isOpen}">
+        <span class="room-name">${esc(room.name)}</span>
+        <span class="pill ${openN ? "" : tradeAll.length ? "clear" : "none"}">${openN ? openN + " open" : tradeAll.length ? "Clear" : "No items"}</span>
+        <svg class="chev" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+      </button>
+      ${isOpen ? `<div class="room-body">
+        ${ui.editRoom === room.id ? `<div class="edit" style="padding:12px 14px"><input type="text" id="rname-${room.id}" maxlength="40" value="${esc(room.name)}" aria-label="Room name"><select id="rfloor-${room.id}" aria-label="Floor">${FLOORS.map(f => `<option${f === room.floor ? " selected" : ""}>${f}</option>`).join("")}</select><div class="acts"><button type="button" class="btn" data-cancel>Cancel</button><button type="button" class="btn primary" data-saveroom="${room.id}">Save</button></div></div>` : ""}
+        <ul>${lis}</ul>
+        ${!vis.length ? `<div class="empty">${!tradeAll.length ? "No items yet. Add the first one below." : ui.show === "open" ? "Nothing open in this room." : "Nothing completed here yet."}</div>` : ""}
+        <form class="add" data-add="${room.id}">
+          <input id="add-${room.id}" type="text" maxlength="160" placeholder="New Item" aria-label="New punch item for ${esc(room.name)}">
+          <select id="addtrade-${room.id}" aria-label="Trade">${tradeOpts(ui.trade || "General")}</select>
+          <button class="btn primary" type="submit">Add</button>
+        </form>
+        ${conf ? `<div class="confirm">Remove ${esc(room.name)} and its punch items from this list?
+            <div class="acts"><button type="button" class="btn" data-cancel>Keep it</button><button type="button" class="btn danger" data-delroom="${room.id}">Remove room</button></div></div>`
+          : `<div class="room-foot" style="gap:16px"><button type="button" class="link" data-editroom="${room.id}">Rename room</button><button type="button" class="link muted" data-askroom="${room.id}">Remove room</button></div>`}
+      </div>` : ""}
+    </section>`;
+  });
+  let html = "";
+  FLOORS.forEach(fl => {
+    const sec = rooms.map((r, i) => r.floor === fl ? parts[i] : "").join("");
+    if (sec) html += `<h2 class="floor">${fl}</h2>` + sec;
+  });
+
+  const openTotal = total - done;
+  const pct = total ? Math.round(done / total * 100) : 0;
+  document.getElementById("openN").textContent = openTotal;
+  document.getElementById("openL").textContent = (openTotal === 1 ? "open item" : "open items") + (ui.trade ? " · " + ui.trade : "") + ` · ${pct}% done`;
+  document.getElementById("gaugeFill").style.width = pct + "%";
+  document.getElementById("gauge").setAttribute("aria-valuenow", pct);
+
+  const focusId = document.activeElement && document.activeElement.id;
+  const keep = {};
+  document.querySelectorAll("#rooms input[type=text], #rooms textarea, #rooms select").forEach(el => keep[el.id] = el.value);
+  document.getElementById("rooms").innerHTML = html || `<div class="empty">No rooms have ${esc(ui.trade)} items.</div>`;
+  Object.entries(keep).forEach(([k, v]) => { const el = document.getElementById(k); if (el) el.value = v; });
+  if (focusId) { const el = document.getElementById(focusId); if (el) el.focus({ preventScroll: true }); }
+  document.querySelectorAll("[data-meta]").forEach(el => { if (document.activeElement !== el) el.value = state.meta[el.dataset.meta] || ""; });
+  document.title = [state.meta.lot && "Lot " + state.meta.lot, state.meta.community].filter(Boolean).join(" · ") || "Punch List";
+}
+
+function listText() {
+  const lines = [], m = state.meta;
+  lines.push("PUNCH LIST" + (ui.trade ? " · " + ui.trade : ""));
+  [m.date && "Date: " + fmtDay(m.date), m.community && "Community: " + m.community, m.address && "Address: " + m.address, m.lot && "Lot: " + m.lot].filter(Boolean).forEach(l => lines.push(l));
+  lines.push("");
+  let any = false;
+  allRooms().forEach(room => {
+    const open = itemsOf(room).filter(i => !rec(i.id).done && (!ui.trade || i.trade === ui.trade));
+    if (!open.length) return;
+    any = true;
+    lines.push(room.name.toUpperCase());
+    open.forEach(i => { lines.push("[ ] " + i.text + (ui.trade ? "" : " (" + i.trade + ")")); if (rec(i.id).note) lines.push("    " + rec(i.id).note.replace(/\n/g, " ")); });
+    lines.push("");
+  });
+  if (!any) lines.push("No open items.");
+  return lines.join("\n").trim();
+}
+
+// ---- render: jobs list ----
+function renderJobs() {
+  const rows = Object.entries(jobsList).sort((a, b) => (b[1].createdAt || "").localeCompare(a[1].createdAt || ""));
+  document.getElementById("jobs").innerHTML = rows.length ? rows.map(([id, j]) => {
+    const title = [j.lot && "Lot " + j.lot, j.community].filter(Boolean).join(" · ") || "Untitled punch list";
+    const sub = [j.address, j.date && fmtDay(j.date)].filter(Boolean).join(" · ");
+    const pill = typeof j.openCount === "number" && j.totalCount ? (j.openCount ? `<span class="pill">${j.openCount} open</span>` : `<span class="pill clear">Clear</span>`) : `<span class="pill none">No items</span>`;
+    return `<li><a href="?job=${encodeURIComponent(id)}" data-job="${esc(id)}"><span class="j-main"><span class="j-title">${esc(title)}</span>${sub ? `<span class="j-sub">${esc(sub)}</span>` : ""}</span>${pill}</a></li>`;
+  }).join("") : `<li class="empty">No punch lists yet. Tap <b>New punch list</b> to start one.</li>`;
+}
+
+// ---- navigation ----
+function stopListening() { unsubs.forEach(u => { try { u(); } catch (e) {} }); unsubs = []; }
+function showJobs() {
+  stopListening(); jobId = null;
+  document.getElementById("jobView").hidden = true;
+  document.getElementById("jobsView").hidden = false;
+  document.title = "Punch Lists";
+  document.getElementById("offlineBanner").hidden = !!fs;
+  if (fs) {
+    document.getElementById("jobsSaved").textContent = "Loading…";
+    unsubs.push(fs.collection("jobs").onSnapshot(snap => {
+      jobsList = {}; snap.docs.forEach(d => jobsList[d.id] = d.data());
+      document.getElementById("jobsSaved").textContent = ""; renderJobs();
+    }, () => { document.getElementById("jobsSaved").textContent = "Couldn't load. Check your connection."; }));
+  } else {
+    jobsList = {};
+    Object.entries(local.jobs).forEach(([id, s]) => { const c = (() => { state = s; return counts(); })(); jobsList[id] = Object.assign({}, s.meta, { openCount: c.open, totalCount: c.total }); });
+    state = blank(); renderJobs();
+  }
+}
+function showJob(id) {
+  stopListening(); jobId = id;
+  state = fs ? blank() : Object.assign(blank(), local.jobs[id] || { meta: { createdAt: new Date().toISOString() } });
+  const p = uiPrefs(); ui.open = (p.open && p.open[id]) || {}; ui.edit = null; ui.confirm = null; ui.editRoom = null;
+  document.getElementById("jobsView").hidden = true;
+  document.getElementById("jobView").hidden = false;
+  document.getElementById("confirmDelJob").hidden = true;
+  document.getElementById("copyBox").hidden = true;
+  window.scrollTo(0, 0);
+  render();
+  if (!fs) { flag("Saved on this phone"); return; }
+  flag("Syncing…");
+  const lost = () => flag("Live sync stopped. Reload to reconnect.");
+  COLLS.forEach(coll => {
+    unsubs.push(fs.collection("jobs/" + id + "/" + coll).onSnapshot(snap => {
+      const next = {}; snap.docs.forEach(d => { next[d.id] = d.data(); });
+      state[coll] = next; render(); flag(snap.metadata.fromCache ? "Saved on this phone. Syncing…" : "Synced");
+    }, lost));
+  });
+  unsubs.push(fs.doc("jobs/" + id).onSnapshot(snap => { state.meta = snap.exists ? Object.assign({}, snap.data()) : {}; render(); }, () => {}));
+}
+function route() {
+  const id = new URLSearchParams(location.search).get("job");
+  if (id) showJob(id); else showJobs();
+}
+function go(id) { history.pushState(null, "", id ? "?job=" + encodeURIComponent(id) : location.pathname); route(); }
+window.addEventListener("popstate", route);
+
+// ---- trades (shared, editable) ----
+function saveSettings() { if (fs) fs.doc("settings/app").set({ trades: TRADES, floors: FLOORS }).catch(() => toast("Couldn't save.")); else { local.trades = TRADES; local.floors = FLOORS; lsSave(); } }
+function applyTrades() {
+  const tf = document.getElementById("tradeF"), cur = ui.trade;
+  tf.innerHTML = `<option value="">All trades</option>` + tradeOpts(cur); tf.value = cur;
+  document.getElementById("tradeList").innerHTML = TRADES.map((t, i) => `<span class="trade">${esc(t)} <button type="button" class="x" data-deltrade="${i}" aria-label="Remove ${esc(t)}">×</button></span>`).join("");
+  const nf = document.getElementById("newRoomFloor"), cf = nf.value;
+  nf.innerHTML = FLOORS.map(f => `<option>${esc(f)}</option>`).join("");
+  if (FLOORS.includes(cf)) nf.value = cf; else nf.selectedIndex = FLOORS.length > 1 ? 1 : 0;
+  document.getElementById("floorList").innerHTML = FLOORS.map((f, i) => `<span class="trade">${esc(f)} <button type="button" class="x" data-delfloor="${i}" aria-label="Remove ${esc(f)}">×</button></span>`).join("");
+  render();
+}
+
+// ---- events ----
+applyTrades();
+if (fs) fs.doc("settings/app").onSnapshot(snap => { const d = snap.exists ? snap.data() : {}; TRADES = Array.isArray(d.trades) && d.trades.length ? d.trades : DEFAULT_TRADES.slice(); FLOORS = Array.isArray(d.floors) && d.floors.length ? d.floors : DEFAULT_FLOORS.slice(); applyTrades(); }, () => {});
+else { if (Array.isArray(local.trades) && local.trades.length) TRADES = local.trades; if (Array.isArray(local.floors) && local.floors.length) FLOORS = local.floors; applyTrades(); }
+document.getElementById("floorList").addEventListener("click", e => { const b = e.target.closest("[data-delfloor]"); if (!b) return; if (FLOORS.length < 2) { toast("Keep at least one list"); return; } FLOORS.splice(+b.dataset.delfloor, 1); saveSettings(); applyTrades(); });
+document.getElementById("tradesBtn").addEventListener("click", () => { const b = document.getElementById("tradesBox"); b.hidden = !b.hidden; });
+document.getElementById("tradeList").addEventListener("click", e => { const b = e.target.closest("[data-deltrade]"); if (!b) return; TRADES.splice(+b.dataset.deltrade, 1); saveSettings(); applyTrades(); });
+document.getElementById("showF").addEventListener("change", e => { ui.show = e.target.value; render(); });
+document.getElementById("tradeF").addEventListener("change", e => { ui.trade = e.target.value; render(); });
+document.querySelectorAll("[data-meta]").forEach(el => el.addEventListener("input", () => { state.meta = Object.assign({}, state.meta, { [el.dataset.meta]: el.value }); saveMeta(); }));
+document.getElementById("tipX").addEventListener("click", () => { document.getElementById("tip").hidden = true; uiSave(); });
+document.getElementById("backBtn").addEventListener("click", () => go(null));
+document.getElementById("newJob").addEventListener("click", async () => {
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const today = new Date(); const d = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
+  const meta = { date: d, community: "", address: "", lot: "", createdAt: new Date().toISOString() };
+  if (fs) { fs.doc("jobs/" + id).set(meta).catch(() => toast("Couldn't create the list. Check your connection.")); }
+  else { local.jobs[id] = Object.assign(blank(), { meta }); lsSave(); }
+  go(id);
+  setTimeout(() => document.getElementById("jCommunity").focus(), 50);
+});
+document.getElementById("jobs").addEventListener("click", e => {
+  const a = e.target.closest("a[data-job]"); if (!a) return;
+  e.preventDefault(); go(a.dataset.job);
+});
+function copyOut(text, okMsg) {
+  const box = document.getElementById("copyBox"), ta = document.getElementById("copyText");
+  ta.value = text;
+  const fallback = () => { box.hidden = false; ta.focus(); ta.select(); toast("Select the text below and copy it"); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => { box.hidden = true; toast(okMsg); }, fallback);
+  else fallback();
+}
+document.getElementById("copyBtn").addEventListener("click", () => copyOut(listText(), "Copied. Paste it into a text or email."));
+document.getElementById("linkBtn").addEventListener("click", () => {
+  const url = location.origin + location.pathname + "?job=" + encodeURIComponent(jobId);
+  const title = document.title;
+  if (navigator.share) navigator.share({ title, text: "Punch list: " + title, url }).catch(() => {});
+  else copyOut(url, "Link copied. Anyone with it can open and check off this list.");
+});
+document.getElementById("askDelJob").addEventListener("click", () => { document.getElementById("confirmDelJob").hidden = false; });
+document.getElementById("keepJob").addEventListener("click", () => { document.getElementById("confirmDelJob").hidden = true; });
+document.getElementById("delJob").addEventListener("click", async () => {
+  const id = jobId;
+  if (fs) {
+    try {
+      for (const coll of COLLS) { const snap = await fs.collection("jobs/" + id + "/" + coll).get(); for (const d of snap.docs) await d.ref.delete(); }
+      await fs.doc("jobs/" + id).delete();
+    } catch (e) { toast("Couldn't delete. Check your connection."); return; }
+  } else { delete local.jobs[id]; lsSave(); }
+  toast("Punch list deleted"); go(null);
+});
+document.addEventListener("change", e => {
+  const cb = e.target.closest(".item input[type=checkbox]");
+  if (!cb) return;
+  const id = cb.closest(".item").dataset.id;
+  state.items[id] = Object.assign({}, rec(id), { done: cb.checked, doneAt: cb.checked ? new Date().toISOString() : null });
+  render(); saveItem(id);
+});
+document.addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b || !b.closest("#rooms")) return;
+  const d = b.dataset;
+  if (d.toggle) { ui.open[d.toggle] = !ui.open[d.toggle]; ui.confirm = null; uiSave(); render(); }
+  else if (d.edit) { ui.edit = d.edit; render(); document.getElementById("note-" + d.edit)?.focus(); }
+  else if (d.editroom) { ui.editRoom = d.editroom; ui.confirm = null; render(); document.getElementById("rname-" + d.editroom)?.focus(); }
+  else if (d.saveroom) {
+    const id = d.saveroom, name = document.getElementById("rname-" + id).value.trim(), floor = document.getElementById("rfloor-" + id).value;
+    if (name) { const old = state.rooms[id] || {}; state.rooms[id] = Object.assign({}, old, { name, floor, createdAt: old.createdAt || new Date().toISOString() }); put("rooms", id, state.rooms[id]); }
+    ui.editRoom = null; render();
+  }
+  else if (b.hasAttribute("data-cancel")) { ui.edit = null; ui.confirm = null; ui.editRoom = null; render(); }
+  else if (d.saveedit) {
+    const id = d.saveedit;
+    const note = document.getElementById("note-" + id).value.trim(), trade = document.getElementById("trade-" + id).value;
+    const text = document.getElementById("text-" + id).value.trim();
+    ui.edit = null; state.items[id] = Object.assign({}, rec(id), { note, trade });
+    if (text && state.custom[id] && text !== state.custom[id].text) { state.custom[id] = Object.assign({}, state.custom[id], { text }); put("custom", id, state.custom[id]); }
+    render(); saveItem(id);
+  }
+  else if (d.delitem) {
+    const id = d.delitem;
+    delete state.custom[id]; delete state.items[id];
+    put("custom", id, null).then(() => put("items", id, null));
+    render(); toast("Item removed");
+  }
+  else if (d.askroom) { ui.confirm = d.askroom; render(); }
+  else if (d.delroom) {
+    const id = d.delroom; ui.confirm = null;
+    if (state.rooms[id]) { delete state.rooms[id]; put("rooms", id, null); }
+    if (ROOMS.some(b => b.id === id)) { state.hidden[id] = { hidden: true }; put("hidden", id, { hidden: true }); }
+    render(); toast("Room removed");
+  }
+});
+document.addEventListener("submit", e => {
+  const f = e.target;
+  e.preventDefault();
+  if (f.id === "addRoom") {
+    const inp = document.getElementById("newRoom"), name = inp.value.trim();
+    if (!name) return;
+    const id = "r-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    state.rooms[id] = { name, floor: document.getElementById("newRoomFloor").value, createdAt: new Date().toISOString() }; ui.open[id] = true; inp.value = "";
+    render(); uiSave(); put("rooms", id, state.rooms[id]);
+    document.getElementById("add-" + id)?.focus();
+    return;
+  }
+  if (f.id === "addFloor") { const inp = document.getElementById("newFloor"), t = inp.value.trim(); if (t && !FLOORS.some(x => x.toLowerCase() === t.toLowerCase())) { FLOORS.push(t); saveSettings(); applyTrades(); } inp.value = ""; return; }
+  if (f.id === "addTrade") { const inp = document.getElementById("newTrade"), t = inp.value.trim(); if (t && !TRADES.some(x => x.toLowerCase() === t.toLowerCase())) { TRADES.push(t); saveSettings(); applyTrades(); } inp.value = ""; return; }
+  if (!f.dataset.add) return;
+  const room = f.dataset.add, inp = document.getElementById("add-" + room), text = inp.value.trim();
+  if (!text) return;
+  const id = "c-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  const data = { room, text, trade: document.getElementById("addtrade-" + room).value, createdAt: new Date().toISOString() };
+  state.custom[id] = data; inp.value = "";
+  render(); document.getElementById("add-" + room)?.focus(); put("custom", id, data);
+});
+
+// ---- boot ----
+if (uiPrefs().tipHidden || navigator.standalone) document.getElementById("tip").hidden = true;
+route();
+</script>
+</body>
+</html>
