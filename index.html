@@ -214,7 +214,8 @@ ul.jobs a:hover { border-color: var(--muted); }
       <div class="row1">
         <div>
           <div class="eyebrow">Final walkthrough</div>
-          <h1>Punch List</h1>
+          <!-- CHANGED: this heading used to just say "Punch List". It now has an id so the script can fill it with "Community - Lot" from the job info fields below. -->
+          <h1 id="jobTitle">Punch List</h1>
         </div>
         <!-- Live count of open items; updated by render() -->
         <div class="count"><div class="big" id="openN">0</div><div class="lbl" id="openL">open items</div></div>
@@ -422,6 +423,14 @@ const fmtDay = d => { if (!d) return ""; const [y, m, dd] = d.split("-").map(Num
 // Build <option> tags for the trade dropdowns, with the selected one marked. If an item uses a trade that was later deleted, it's still included so it doesn't vanish.
 const tradeOpts = sel => (sel && !TRADES.includes(sel) ? TRADES.concat(sel) : TRADES).map(t => `<option${t === sel ? " selected" : ""}>${esc(t)}</option>`).join("");
 
+// ADDED: sets the big heading on the job screen to "Community - Lot" (e.g. "Oakwood - 12").
+// If only one of the two is filled in, it shows just that one. If both are empty, it falls back to "Punch List".
+// To show "Lot 12" instead of just "12", change state.meta.lot below to ("Lot " + state.meta.lot).
+function updateTitle() {
+  const m = state.meta;
+  document.getElementById("jobTitle").textContent = [m.community, m.lot].filter(Boolean).join(" - ") || "Punch List";
+}
+
 // Redraws the whole punch list screen from the current state. Called after almost every change.
 function render() {
   if (!jobId) return;
@@ -501,6 +510,7 @@ function render() {
   document.querySelectorAll("[data-meta]").forEach(el => { if (document.activeElement !== el) el.value = state.meta[el.dataset.meta] || ""; });
   // Browser tab title becomes "Lot 12 · Community Name"
   document.title = [state.meta.lot && "Lot " + state.meta.lot, state.meta.community].filter(Boolean).join(" · ") || "Punch List";
+  updateTitle(); // ADDED: refresh the heading whenever the screen redraws
 }
 
 // Builds the plain-text version of the list (open items only) that gets copied and sent to subcontractors
@@ -623,8 +633,8 @@ document.getElementById("tradeList").addEventListener("click", e => { const b = 
 // Status and trade filter dropdowns
 document.getElementById("showF").addEventListener("change", e => { ui.show = e.target.value; render(); });
 document.getElementById("tradeF").addEventListener("change", e => { ui.trade = e.target.value; render(); });
-// Typing in any job detail field updates state and triggers a debounced save
-document.querySelectorAll("[data-meta]").forEach(el => el.addEventListener("input", () => { state.meta = Object.assign({}, state.meta, { [el.dataset.meta]: el.value }); saveMeta(); }));
+// Typing in any job detail field updates state, updates the heading right away (CHANGED: updateTitle() added), and triggers a debounced save
+document.querySelectorAll("[data-meta]").forEach(el => el.addEventListener("input", () => { state.meta = Object.assign({}, state.meta, { [el.dataset.meta]: el.value }); updateTitle(); saveMeta(); }));
 // Dismiss the install tip and remember that choice
 document.getElementById("tipX").addEventListener("click", () => { document.getElementById("tip").hidden = true; uiSave(); });
 document.getElementById("backBtn").addEventListener("click", () => go(null));
