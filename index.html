@@ -190,12 +190,12 @@ ul.jobs a:hover { border-color: var(--muted); }
   <div id="jobsView" hidden>
     <div class="titlebar">
       <div class="eyebrow">Final walkthrough</div>
-      <h1>Punch Lists</h1>
+      <h1>All Lists</h1>
     </div>
     <!-- Only shown when Firebase isn't configured (data is stored on this phone only) -->
     <div class="banner" id="offlineBanner" hidden>Shared saving isn't set up yet, so lists are saved on this phone only. Add your Firebase settings to <b>firebase-config.js</b> to share them.</div>
     <div class="tools" style="margin-top:16px">
-      <button type="button" class="btn primary" id="newJob">New punch list</button>
+      <button type="button" class="btn primary" id="newJob">New list</button>
       <span class="saved" id="jobsSaved"></span>
     </div>
     <!-- Filled in by renderJobs() -->
@@ -210,12 +210,12 @@ ul.jobs a:hover { border-color: var(--muted); }
   <!-- ===== SCREEN 2: One job (a single punch list). Hidden/shown by JS. ===== -->
   <div id="jobView" hidden>
     <div class="titlebar">
-      <button type="button" class="back" id="backBtn">‹ All punch lists</button>
+      <button type="button" class="back" id="backBtn">‹ All lists</button>
       <div class="row1">
         <div>
           <div class="eyebrow">Final walkthrough</div>
           <!-- CHANGED: this heading used to just say "Punch List". It now has an id so the script can fill it with "Community - Lot" from the job info fields below. -->
-          <h1 id="jobTitle">Punch List</h1>
+          <h1 id="jobTitle">New List</h1>
         </div>
         <!-- Live count of open items; updated by render() -->
         <div class="count"><div class="big" id="openN">0</div><div class="lbl" id="openL">open items</div></div>
@@ -261,10 +261,10 @@ ul.jobs a:hover { border-color: var(--muted); }
 
     <!-- Delete-the-whole-list link and its confirmation box -->
     <div class="danger-zone" id="dangerZone">
-      <button type="button" class="link muted" id="askDelJob">Delete this punch list</button>
+      <button type="button" class="link muted" id="askDelJob">Delete this list</button>
     </div>
     <div class="confirm boxed" id="confirmDelJob" hidden>
-      Delete this whole punch list for everyone? This can't be undone.
+      Delete this whole list for everyone? This can't be undone.
       <div class="acts"><button type="button" class="btn" id="keepJob">Keep it</button><button type="button" class="btn danger" id="delJob">Delete</button></div>
     </div>
   </div>
@@ -431,7 +431,7 @@ const tradeOpts = sel => (sel && !TRADES.includes(sel) ? TRADES.concat(sel) : TR
 // To show "Lot 12" instead of just "12", change state.meta.lot below to ("Lot " + state.meta.lot).
 function updateTitle() {
   const m = state.meta;
-  document.getElementById("jobTitle").textContent = [m.community, m.lot].filter(Boolean).join(" - ") || "Punch List";
+  document.getElementById("jobTitle").textContent = [m.community, m.lot].filter(Boolean).join(" - ") || "New List";
 }
 
 // Redraws the whole punch list screen from the current state. Called after almost every change.
@@ -513,14 +513,14 @@ function render() {
   // Fill the job detail inputs (skipping the one being typed in so it doesn't get overwritten)
   document.querySelectorAll("[data-meta]").forEach(el => { if (document.activeElement !== el) el.value = state.meta[el.dataset.meta] || ""; });
   // Browser tab title becomes "Lot 12 · Community Name"
-  document.title = [state.meta.lot && "Lot " + state.meta.lot, state.meta.community].filter(Boolean).join(" · ") || "Punch List";
+  document.title = [state.meta.lot && "Lot " + state.meta.lot, state.meta.community].filter(Boolean).join(" · ") || "New List";
   updateTitle(); // ADDED: refresh the heading whenever the screen redraws
 }
 
 // Builds the plain-text version of the list (open items only) that gets copied and sent to subcontractors
 function listText() {
   const lines = [], m = state.meta;
-  lines.push("PUNCH LIST" + (ui.trade ? " · " + ui.trade : ""));
+  lines.push("LIST" + (ui.trade ? " · " + ui.trade : ""));
   [m.date && "Date: " + fmtDay(m.date), m.community && "Community: " + m.community, m.address && "Address: " + m.address, m.lot && "Lot: " + m.lot].filter(Boolean).forEach(l => lines.push(l));
   lines.push("");
   let any = false;
@@ -541,22 +541,22 @@ function renderJobs() {
   // Newest first
   const rows = Object.entries(jobsList).sort((a, b) => (b[1].createdAt || "").localeCompare(a[1].createdAt || ""));
   document.getElementById("jobs").innerHTML = rows.length ? rows.map(([id, j]) => {
-    const title = [j.lot && "Lot " + j.lot, j.community].filter(Boolean).join(" · ") || "Untitled punch list";
+    const title = [j.lot && "Lot " + j.lot, j.community].filter(Boolean).join(" · ") || "Untitled list";
     const sub = [j.address, j.date && fmtDay(j.date)].filter(Boolean).join(" · ");
     const pill = typeof j.openCount === "number" && j.totalCount ? (j.openCount ? `<span class="pill">${j.openCount} open</span>` : `<span class="pill clear">Clear</span>`) : `<span class="pill none">No items</span>`;
     return `<li><a href="?job=${encodeURIComponent(id)}" data-job="${esc(id)}"><span class="j-main"><span class="j-title">${esc(title)}</span>${sub ? `<span class="j-sub">${esc(sub)}</span>` : ""}</span>${pill}</a></li>`;
-  }).join("") : `<li class="empty">No punch lists yet. Tap <b>New punch list</b> to start one.</li>`;
+  }).join("") : `<li class="empty">No lists have been made yet. Tap <b>New list</b> to start one.</li>`;
 }
 
 // ================= NAVIGATION =================
 // Stop all live Firestore listeners (called when switching screens)
 function stopListening() { unsubs.forEach(u => { try { u(); } catch (e) {} }); unsubs = []; }
-// Show the home screen with the list of all punch lists
+// Show the home screen with the list of all lists
 function showJobs() {
   stopListening(); jobId = null;
   document.getElementById("jobView").hidden = true;
   document.getElementById("jobsView").hidden = false;
-  document.title = "Punch Lists";
+  document.title = "All Lists";
   document.getElementById("offlineBanner").hidden = !!fs; // show the banner only in local-only mode
   if (fs) {
     // Live-listen to the "jobs" collection so the list updates automatically
@@ -572,7 +572,7 @@ function showJobs() {
     state = blank(); renderJobs();
   }
 }
-// Open one punch list by id
+// Open one list by id
 function showJob(id) {
   stopListening(); jobId = id;
   // Firestore mode starts empty and fills in as data arrives; local mode loads from localStorage
@@ -642,7 +642,7 @@ document.querySelectorAll("[data-meta]").forEach(el => el.addEventListener("inpu
 // Dismiss the install tip and remember that choice
 document.getElementById("tipX").addEventListener("click", () => { document.getElementById("tip").hidden = true; uiSave(); });
 document.getElementById("backBtn").addEventListener("click", () => go(null));
-// "New punch list": creates a job with a random id and today's date, then opens it
+// "New list": creates a job with a random id and today's date, then opens it
 document.getElementById("newJob").addEventListener("click", async () => {
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const today = new Date(); const d = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
@@ -671,7 +671,7 @@ document.getElementById("copyBtn").addEventListener("click", () => copyOut(listT
 document.getElementById("linkBtn").addEventListener("click", () => {
   const url = location.origin + location.pathname + "?job=" + encodeURIComponent(jobId);
   const title = document.title;
-  if (navigator.share) navigator.share({ title, text: "Punch list: " + title, url }).catch(() => {});
+  if (navigator.share) navigator.share({ title, text: "List: " + title, url }).catch(() => {});
   else copyOut(url, "Link copied. Anyone with it can open and check off this list.");
 });
 // Delete-whole-list flow: ask, then confirm or cancel
@@ -686,7 +686,7 @@ document.getElementById("delJob").addEventListener("click", async () => {
       await fs.doc("jobs/" + id).delete();
     } catch (e) { toast("Couldn't delete. Check your connection."); return; }
   } else { delete local.jobs[id]; lsSave(); }
-  toast("Punch list deleted"); go(null);
+  toast("List deleted"); go(null);
 });
 // Checking/unchecking an item: record done + timestamp, redraw right away, then save
 document.addEventListener("change", e => {
